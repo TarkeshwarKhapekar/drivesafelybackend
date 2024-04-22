@@ -1,0 +1,716 @@
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.verifyOTP = exports.updateStatus = exports.updateProfile = exports.updatePassword = exports.socialReg = exports.save = exports.paswordForgot = exports.onLogin = exports.logoutUser = exports.imgUpload = exports.imgMultipleUpload = exports.imgBase64Upload = exports.getProfile = exports.getAllUser = exports.deleteUser = exports.changePassword = void 0;
+var _mongoose = _interopRequireDefault(require("mongoose"));
+var _user = _interopRequireDefault(require("../collections/user"));
+var _messages = _interopRequireDefault(require("../utilities/messages"));
+var _universal = require("../utilities/universal");
+var COMMON = _interopRequireWildcard(require("./common"));
+var Mail = _interopRequireWildcard(require("../utilities/mail"));
+var _config = _interopRequireDefault(require("config"));
+var _mailchimp_marketing = _interopRequireDefault(require("@mailchimp/mailchimp_marketing"));
+function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
+function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+/*
+ * @file: USERMODEL.js
+ * @description: It Contain function layer for user service.
+ * @author: Pankaj Chaudhari
+ */
+
+const {
+  mailchimp_key,
+  mailchimp_audience_id
+} = _config.default.get('app');
+_mailchimp_marketing.default.setConfig({
+  apiKey: mailchimp_key,
+  server: 'us2'
+});
+const {
+  frontendUrl
+} = _config.default.get("app");
+const formidable = require("formidable");
+const form = formidable({
+  multiples: true
+});
+
+// This id should always be the current id of the quenstionaire answer Virtual/online
+// TODO: Please change this id when reseeding database.
+const VIRTUALSERVICE = "5eb1a4e199957471610e6cf2";
+
+// import {
+//   CreateUser,
+//   createCharge,
+//   couponCreate,
+//   CreateToken, monthlyWithSubscription, deleteSubscription, InvoicSubscription, monthlyWitOutCouponSubscription,
+//   createPricePlan,
+//   getSubscriptionByID,
+//   RetrieveUser,
+//   CreateCheckoutSession,
+//   CreatePortalSession,
+//   constructStripeEvent
+// } from "./stripe";
+
+/********** Save users **********/
+const save = async payload => {
+  payload.email = payload.email.toLowerCase();
+  const userExists = await _user.default.checkEmail(payload.email);
+  if (userExists) throw new Error(_messages.default.emailAlreadyExists);
+  const pwd = payload.password;
+  payload["password"] = (0, _universal.encryptpassword)(payload.password);
+  payload["ringpassword"] = pwd;
+  const lng = payload.language ? payload.language : "";
+  let saveData = await _user.default.saveUser(payload);
+
+  /*************** Create Stripe Customer ***************/
+  if (saveData.roles === 'SP' || saveData.roles === 'C') {
+    // console.log(saveData);
+    // const customer = await CreateUser(saveData.email, saveData._id.toString());
+
+    // await USERMODEL.findByIdAndUpdate({ _id: mongoose.Types.ObjectId(saveData._id) }, {
+    //   stripeCustId: customer.id
+    // }, { new: true });
+  }
+  // await subscribe(payload);
+
+  let loginToken = (0, _universal.generateToken)({
+    when: (0, _universal.getTimeStamp)(),
+    roles: payload.roles,
+    userId: saveData._id,
+    email: saveData.email,
+    deviceType: payload.deviceType,
+    deviceToken: payload.deviceToken,
+    language: payload.language ? payload.language : ""
+  });
+  const data = await _user.default.onLoginDone(saveData._id, loginToken, lng);
+  let message = "Welcome and thanks for joining us";
+
+  // if (payload.roles == "U") {
+  //   message = "Welcome and thanks for joining "
+  // }
+
+  /***************** verificatiopn email ****************/
+  const result = await Mail.htmlFromatWithObject({
+    message: message,
+    email: saveData.email,
+    name: "User",
+    password: pwd,
+    emailTemplate: "user-account"
+  });
+  const emailData = {
+    to: saveData.email,
+    subject: Mail.subjects.registerRequest,
+    html: result.html,
+    templateId: "user-account"
+  };
+  Mail.SENDEMAIL(emailData, function (err, res) {
+    if (err) console.log("-----@@----- Error at sending verify mail to user -----@@-----", err);else console.log("-----@@----- Response at sending verify mail to user -----@@-----", res);
+  });
+  return {
+    _id: saveData._id,
+    email: saveData.email,
+    loginToken: loginToken,
+    // lastLogin: saveData.lastLogin,
+    name: saveData.firstName,
+    roles: saveData.roles,
+    gender: saveData.gender,
+    phone: saveData.phone,
+    language: saveData.language ? saveData.language : ""
+  };
+};
+exports.save = save;
+const socialReg = async payload => {
+  payload.email = payload.email.toLowerCase();
+  var userExists = await _user.default.checkEmail(payload.email);
+  if (!userExists) {
+    userExists = await _user.default.saveUser({
+      ...payload
+    });
+    await subscribe(payload);
+  }
+  let loginToken = (0, _universal.generateToken)({
+    when: (0, _universal.getTimeStamp)(),
+    roles: userExists.roles,
+    userId: userExists._id,
+    email: userExists.email
+  });
+  const data = await _user.default.onLoginDone(userExists._id, loginToken);
+  return {
+    _id: data._id,
+    email: data.email,
+    loginToken: data.loginToken[data.loginToken.length - 1].token,
+    lastLogin: data.lastLogin,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    roles: data.roles,
+    isVipAffiliateUser: data.isVipAffiliateUser
+  };
+};
+
+/********** Login users **********/
+exports.socialReg = socialReg;
+const onLogin = async payload => {
+  console.log(payload, "payload");
+  console.clear();
+  const lng = payload.language ? payload.language : "";
+  console.log("lng ==", lng);
+  payload["email"] = payload.email.toLowerCase();
+  const userData = await _user.default.findOneByCondition({
+    email: payload.email,
+    password: (0, _universal.encryptpassword)(payload.password)
+  });
+  if (!userData) throw new Error(_messages.default.invalidCredentials);
+  if (userData.roles !== payload.loginType && userData.roles == "DRIVER") throw new Error(_messages.default.invalidRole); // ADDING THIS TO VERIFY ROLE
+  if (!userData.status) throw new Error(_messages.default.accountDeactive);
+  let loginToken = (0, _universal.generateToken)({
+    when: new Date(),
+    // lastLogin: userData.lastLogin,
+    userId: userData._id,
+    roles: userData.roles,
+    deviceType: payload.deviceType,
+    deviceToken: payload.deviceToken,
+    corporateCode: userData.corporateCode,
+    language: payload.language ? payload.language : ""
+  });
+  console.log(loginToken, "logintoken");
+  const data = await _user.default.onLoginDone(userData._id, loginToken, lng);
+  return {
+    _id: userData._id,
+    name: userData.name,
+    email: userData.email,
+    roles: userData.roles,
+    loginToken: loginToken,
+    corporateCode: userData.corporateCode,
+    language: payload.language ? payload.language : ""
+    // loginToken[loginToken.length - 1].token,
+    // lastLogin: userData.lastLogin,
+    // lastName: data.lastName,
+    // favouriteBy: data.favouriteBy ? data.favouriteBy : "",
+    // isVipAffiliateUser: data.isVipAffiliateUser
+  };
+};
+
+/********** Save users **********/
+exports.onLogin = onLogin;
+const updateProfile = async payload => {
+  console.log("Updating profile for user", payload.body);
+  let datas = JSON.parse(JSON.stringify(payload.body));
+  delete datas["_id"];
+  let data = {};
+  const query = {
+    _id: _mongoose.default.Types.ObjectId(payload.body._id)
+  };
+  console.log("query", query);
+  console.log("datas", datas);
+  // console.log("ringUse", ringUse)
+
+  // if (payload.body.name) {
+  //   // data.name = payload.body.name
+  //   Object.assign(data,{name:payload.body.name})
+  // }
+  // if (payload.body.email) {
+  //   // data.email = payload.body.email
+  //   Object.assign(data,{email:payload.body.email})
+  // }
+  // if (payload.body.phone) {
+  //   // data.phone = payload.body.phone
+  //   Object.assign(data,{phone:payload.body.phone})
+  // }
+  // if (payload.body.gender) {
+  //   // data.gender = payload.body.gender
+  //   Object.assign(data,{gender:payload.body.gender})
+  // }
+  // if (payload.body.password) {
+  //   // data.password = payload.body.password
+  //   // Object.assign(data,{password:payload.body.password})
+  // }
+  // if (payload.body.corporateCode) {
+  //   // data.corporateCode = payload.body.corporateCode
+  //   Object.assign(data,{corporateCode:payload.body.corporateCode})
+  // }
+  // if (payload.body.corporateId) {
+  //   // data.corporateId = payload.body.corporateId
+  //   // Object.assign(data,{corporateCode:payload.body.corporateCode})
+  // }
+  // if (payload.body.yearOfBirth) {
+  //   // data.yearOfBirth = payload.body.yearOfBirth
+  //   Object.assign(data,{yearOfBirth:payload.body.yearOfBirth})
+  // }
+  // if (payload.body.height) {
+  //   // data.height = payload.body.height
+  //   Object.assign(data,{height:payload.body.height})
+  // }
+  // if (payload.body.weight) {
+  //   // data.weight = payload.body.weight
+  //   Object.assign(data,{weight:payload.body.weight})
+  // }
+  // if (payload.body.restingHeartRate) {
+  //   // data.restingHeartRate = payload.body.restingHeartRate
+  //   Object.assign(data,{restingHeartRate:payload.body.restingHeartRate})
+  // }
+  // if (payload.body.ringUse) {
+
+  //   // data.ringUse = payload.body.ringUse
+
+  // }
+  // if (payload.body.ringId) {
+  //   // data.ringId = payload.body.ringId
+  //   Object.assign(data,{ringId:payload.body.ringId})
+  // }
+  // if (payload.body.code) {
+  //   // data.code = payload.body.code
+  //   Object.assign(data,{code:payload.body.code})
+  // }
+
+  console.log("data", datas);
+  let savedata = await _user.default.findOneAndUpdate(query, datas, {
+    fields: {
+      loginToken: 0,
+      createdAt: 0,
+      updatedAt: 0,
+      password: 0
+    },
+    new: true
+  });
+  return savedata;
+};
+
+/********** Delete user **********/
+exports.updateProfile = updateProfile;
+const deleteUser = async payload => {
+  return await _user.default.findOneAndUpdate({
+    _id: _mongoose.default.Types.ObjectId(payload.id)
+  }, {
+    isDeleted: true
+  }, {
+    fields: {
+      _id: 1
+    },
+    new: true
+  });
+};
+exports.deleteUser = deleteUser;
+const imgBase64Upload = async payload => {
+  let imgesdata = "";
+  let imgLocation = "users";
+  if (payload.body.imgLocation) {
+    imgLocation = payload.body.imgLocation;
+  }
+  if (payload.body.image) {
+    imgesdata = await COMMON.uploadImagebase64(payload.body.image, imgLocation);
+  }
+  const data = {
+    profileImage: imgesdata
+  };
+  const query = {
+    _id: _mongoose.default.Types.ObjectId(payload.user.userId)
+  };
+  let savedata = await _user.default.findOneAndUpdate(query, data, {
+    new: true
+  });
+  return savedata;
+};
+exports.imgBase64Upload = imgBase64Upload;
+const imgUpload = async payload => {
+  let imgesdata = "";
+  let imgLocation = "users";
+  if (payload.imgLocation) {
+    imgLocation = payload.imgLocation;
+  }
+  if (payload.files && payload.files.profileImage) {
+    console.log("                                 ");
+    console.log("Payload files ", payload.files);
+    imgesdata = await COMMON.singleImageUpload(payload.files.profileImage, 'users');
+  }
+  const data = {
+    profileImage: imgesdata
+  };
+  const query = {
+    _id: _mongoose.default.Types.ObjectId(payload.body._id)
+  };
+  let savedata = await _user.default.findOneAndUpdate(query, data, {
+    new: true
+  });
+  return savedata;
+};
+exports.imgUpload = imgUpload;
+const imgMultipleUpload = async payload => {
+  let imgesdata = "";
+  let imgLocation = "products";
+  if (payload.imgLocation) {
+    imgLocation = payload.imgLocation;
+  }
+  if (payload.files && payload.files.images) {
+    imgesdata = await COMMON.multipleImageUpload(payload, imgLocation);
+  }
+  return imgesdata;
+};
+
+// Forgot password function and send link to email for password generate
+exports.imgMultipleUpload = imgMultipleUpload;
+const paswordForgot = async payload => {
+  if (!payload.email) throw new Error(_messages.default.validEmail);
+  payload.email = payload.email.toLowerCase();
+  const userData = await _user.default.checkEmail(payload.email);
+  if (!userData) throw new Error(_messages.default.emailNotExists);
+  const otp = Math.floor(10000 + Math.random() * 90000);
+  if (userData) {
+    // Saving otp to db it will use for verification 
+    let saveData = await _user.default.findOneAndUpdate({
+      _id: userData._id
+    }, {
+      otp: otp
+    }, {
+      fields: {
+        _id: 1,
+        email: 1,
+        otp: 1
+      }
+    });
+
+    /***************** verificatiopn email ****************/
+    const result = await Mail.htmlFromatWithObject({
+      data: userData,
+      otp: otp,
+      emailTemplate: "forgot-password"
+    });
+    const emailData = {
+      to: payload.email,
+      subject: Mail.subjects.forgetPassword,
+      html: result.html,
+      templateId: "forgot-password"
+    };
+    Mail.SENDEMAIL(emailData, function (err, res) {
+      if (err) console.log("-----@@----- Error at sending verify mail to user -----@@-----", err);else console.log("-----@@----- Response at sending verify mail to user -----@@-----", res);
+    });
+    return await saveData;
+  }
+};
+
+// Function to update the OTP 
+exports.paswordForgot = paswordForgot;
+const verifyOTP = async (payload, res) => {
+  try {
+    const data = await _user.default.findOne({
+      _id: payload._id,
+      otp: payload.otp
+    });
+    if (!data) {
+      return {
+        status: 404,
+        success: false,
+        message: "OTP does not match"
+      };
+    } else {
+      return {
+        status: 200,
+        success: true,
+        message: "OTP verified successfully"
+      };
+    }
+  } catch (err) {
+    return {
+      status: 500,
+      success: false,
+      message: "Error",
+      error: err
+    };
+  }
+};
+exports.verifyOTP = verifyOTP;
+const updatePassword = async payload => {
+  try {
+    if (!payload.password) {
+      return res.status(400).json({
+        success: false,
+        message: "password is required"
+      });
+    }
+    if (!payload.confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Confirmpassword is required"
+      });
+    }
+    if (payload.confirmPassword !== payload.password) {
+      return res.status(400).json({
+        success: false,
+        message: "password does not match confirmPassword"
+      });
+    }
+    const user = await _user.default.findOne({
+      _id: payload._id
+    });
+    if (user) {
+      const hashedPassword = await (0, _universal.encryptpassword)(payload.password);
+      const data = await _user.default.findOneAndUpdate({
+        _id: payload._id
+      }, {
+        $set: {
+          password: hashedPassword
+        }
+      });
+      // /***************** verificatiopn email ****************/
+      // const result = await Mail.htmlFromatWithObject({
+      //   data: data,
+      //   password: payload.password,
+      //   emailTemplate: "reset-password",
+      // });
+
+      // const emailData = {
+      //   to: data.email,
+      //   subject: Mail.subjects.resetPassword,
+      //   html: result.html,
+      //   templateId: "reset-password",
+      // };
+
+      // Mail.SENDEMAIL(emailData, function (err, res) {
+      //   if (err)
+      //     console.log(
+      //       "-----@@----- Error at sending verify mail to user -----@@-----",
+      //       err
+      //     );
+      //   else
+      //     console.log(
+      //       "-----@@----- Response at sending verify mail to user -----@@-----",
+      //       res
+      //     );
+      // });
+
+      return data;
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "user not found"
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      success: false,
+      message: "error",
+      error: err
+    });
+  }
+};
+exports.updatePassword = updatePassword;
+const getProfile = async payload => {
+  console.log("Getting profile", payload.id);
+  let matchObj = {
+    _id: _mongoose.default.Types.ObjectId(payload.id)
+  };
+  const queryObj = _user.default.find(matchObj, {
+    updatedAt: 0,
+    loginToken: 0,
+    createdAt: 0,
+    password: 0
+  });
+  return await queryObj;
+};
+/********** Logout users **********/
+exports.getProfile = getProfile;
+const logoutUser = async payload => {
+  return await _user.default.logout(payload.userId, payload.token);
+};
+exports.logoutUser = logoutUser;
+const getAllUser = async (payload, user) => {
+  let corporateCode;
+  console.log("user.corporateCode=====================", user.corporateCode);
+  if (user.roles == 'SUBADMIN') {
+    // roles: payload.roles,
+    //   userId: saveData._id,
+    //get user by id 
+    let userID = user.userId;
+    console.log(userID, "userID");
+    let udetails;
+    try {
+      // udetails = await USERMODEL.findById(userID);
+      // console.log(udetails, "user");
+      corporateCode = user.corporateCode; // udetails.corporateCode;
+
+      console.log("corporateCode from token= ", corporateCode);
+    } catch (error) {
+      console.error(error);
+    }
+    // const udetails = 
+  }
+
+  // console.log(payload.roles)
+  let sort = {
+    [payload.sortBy ? payload.sortBy : "createdAt"]: -1
+  };
+  let limit = payload.count ? JSON.parse(payload.count) : 10;
+  payload.page = payload.page ? payload.page : 1;
+  let skip = JSON.parse((payload.page - 1) * limit);
+  let matchObj = {
+    isDeleted: false,
+    roles: payload.roles
+  };
+  if (user.roles == 'SUBADMIN') {
+    console.log("adding corporate code in query");
+    matchObj = {
+      ...matchObj,
+      corporateCode: corporateCode
+    };
+    console.log("adding corporate code in query", matchObj);
+  }
+  if (payload.role) {
+    matchObj = {
+      ...matchObj,
+      roles: payload.role
+    };
+  }
+  if (payload.search) {
+    payload.search = payload.search.toLowerCase();
+    const regex = new RegExp(`${payload["search"]}`, "i");
+    matchObj = {
+      ...matchObj,
+      $or: [{
+        name: {
+          $regex: regex
+        }
+      }, {
+        email: {
+          $regex: regex
+        }
+      }, {
+        corporateCode: {
+          $regex: regex
+        }
+      }]
+    };
+  }
+  console.log("matchobj before query", matchObj);
+  const queryObj = _user.default.find(matchObj, {
+    _id: 1,
+    name: 1,
+    gender: 1,
+    email: 1,
+    roles: 1,
+    phone: 1,
+    date_registered: 1,
+    status: 1,
+    corporateCode: 1,
+    yearOfBirth: 1,
+    height: 1,
+    weight: 1,
+    restingHeartRate: 1,
+    ringUse: 1,
+    ringId: 1
+  });
+  let count = await queryObj;
+  let data = await queryObj.skip(skip).limit(limit).sort(sort);
+  return {
+    data: data,
+    total: count.length
+  };
+};
+exports.getAllUser = getAllUser;
+const changePassword = async (userId, payload, res) => {
+  const currentpwd = await (0, _universal.encryptpassword)(payload.currentpwd);
+  try {
+    if (!payload.currentpwd) {
+      return {
+        status: 400,
+        success: false,
+        message: "currentpwd is required"
+      };
+    }
+    if (!payload.password) {
+      return {
+        status: 400,
+        success: false,
+        message: "password is required"
+      };
+    }
+    if (!payload.confirmPassword) {
+      return {
+        status: 400,
+        success: false,
+        message: "Confirmpassword is required"
+      };
+    }
+    if (payload.confirmPassword !== payload.password) {
+      return {
+        status: 400,
+        success: false,
+        message: "password does not match confirmPassword"
+      };
+    }
+    const user = await _user.default.findOneByCondition({
+      _id: userId
+    });
+    if (user.password == (0, _universal.encryptpassword)(payload.currentpwd)) {
+      console.log("password matched");
+    } else {
+      throw new Error(_messages.default.invalidCredentials);
+    }
+    if (user) {
+      const hashedPassword = await (0, _universal.encryptpassword)(payload.password);
+      const data = await _user.default.findOneAndUpdate({
+        _id: userId
+      }, {
+        $set: {
+          password: hashedPassword
+        }
+      });
+      // /***************** verificatiopn email ****************/
+      // const result = await Mail.htmlFromatWithObject({
+      //   data: data,
+      //   password: payload.password,
+      //   emailTemplate: "reset-password",
+      // });
+
+      // const emailData = {
+      //   to: data.email,
+      //   subject: Mail.subjects.resetPassword,
+      //   html: result.html,
+      //   templateId: "reset-password",
+      // };
+
+      // Mail.SENDEMAIL(emailData, function (err, res) {
+      //   if (err)
+      //     console.log(
+      //       "-----@@----- Error at sending verify mail to user -----@@-----",
+      //       err
+      //     );
+      //   else
+      //     console.log(
+      //       "-----@@----- Response at sending verify mail to user -----@@-----",
+      //       res
+      //     );
+      // });
+
+      return {
+        status: 200,
+        data: data
+      };
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "user not found"
+      });
+    }
+  } catch (error) {
+    return {
+      status: 500,
+      success: false,
+      message: "error",
+      error: "Invalid Password"
+    };
+  }
+};
+
+/* Update PRODUCTMODEL based on id */
+exports.changePassword = changePassword;
+const updateStatus = async payload => {
+  return await _user.default.findOneAndUpdate({
+    _id: _mongoose.default.Types.ObjectId(payload.id)
+  }, payload, {
+    new: true
+  });
+};
+exports.updateStatus = updateStatus;

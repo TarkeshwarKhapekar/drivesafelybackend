@@ -1,0 +1,79 @@
+{
+  "app": {
+    "frontendUrl": "http://localhost:4000/",
+    "name": "Driving Safety Application",
+    "host": "http://54.201.160.69",
+    "swaggerURL": "http://54.201.160.69:9185",
+    "swaggerPort": "54.201.160.69:9185",
+    "port": 9185,  
+    "socket": 3002,
+    "debug": true,
+    "logLevel": "debug",
+    "jwtAlgo": "HS512",
+    "jwtKey": "DS-project",
+    "STRIPE_TAX_ID": "",
+    "STRIPE_PRIVATE_KEY": "",
+    "STRIPE_WEBHOOK_SECRET": "",
+    "STRIPE_SP_SUB": "",
+    "STRIPE_C_SUB": "",
+    "mailchimp_key": "",
+    "mailchimp_audience_id": ""
+  },
+  "db": {
+
+    "name": "drivingsafety",
+    "host": "54.201.160.69",
+    "auth": true,
+    "username": "drivingsafety",
+    "password": "KHSWe34r3g",
+    "port": 58173,  
+    "mongoose": {
+      "useMongoClient": true,
+      "poolSize": 10,
+      "bufferMaxEntries": 0
+    }
+  },
+  "ios": {
+    "cert": "",
+    "key": "",
+    "gateway": "gateway.sandbox.push.apple.com",
+    "production": true
+  },
+  "android": {
+    "senderId": "",
+    "apiKey": ""
+  },
+  "twillio": {
+    "sid": "",
+    "token": "",
+    "number": ""
+  },
+  "smtp": {
+    "smtpUser": "pankajsmtp6@gmail.com",
+    "smtpPass": "erdauiqvzuwjwnqq",
+    "smtpPort": 587, 
+    "smtpServer": "smtp.gmail.com",
+    "mailFrom": "Driving Safety<support@gmail.com>"
+  },
+
+  "smtp1": {
+    "smtpUser": "",
+    "smtpPass": "",
+    "smtpPort": 587,
+    "smtpServer": "",
+    "mailFrom": "Driving Safety <support@gmail.com>"
+  },
+  "fcm":{
+    "type": "service_account",
+    "project_id": "testdrivingsafety",
+    "private_key_id": "22862d76240d441ebf9cde2184c0f133a3040087",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCl/g/yNI5FRyNh\nYSnrMtE8oGg/4WhxPHYZdzZfZkbDLN6ZrW10PVqIyXwYnCKvIRO1eges5zTYdjpi\n6XcE4d72JtKKYbPKMtRHjfcoc3OEnGTxVcztoq4N40ty50jZ6VLhzkbJtn+mtyi+\nhpxAIFb6eA8YCVcoN9sSOjuR+pAamu1H02k7a10Mhry0a66T7nwEZl+dXfCag5j9\nBInEqkZqT1Slhk6+7CdfVQfKZu4+nwTUjYMifLMqPWSF/OD7S84j826Zp1PcTgeO\naz2UPpB6P709KMjDbcpdq4ZFeyXK/hlSRm2KZmrj7Rlk5d0mgUCEMY5Csx3AWMlC\n+vhqxesXAgMBAAECggEAKf9pfnEArBOPJpTEW99MJEg7iCoaWEghY1kPtzxz2+7u\n1TgVcOsTDHfZ/4oFloTKbUiWR49qBfiH1j3WoLQbSvFQpLWKnTaWEhKfvarUR/Gf\n8pWwV1GpMxdWoBhXjNblYv9jVqbnjkFaPDZnsyvbhdy5iO3YEPNs6KQ2LT2Vlz1B\ndMUAb2ONhxVhdqlczje6Y3Y44vnF+BAGY20fduNw4eIuB8e8kfuJy44ymUjniqhY\nuGlnY2GHpAaL2QKKrcxHeszrjibREgNGgMKmotFj4mzQypq5OknN8hSGnie1Mbzn\nMZYgx2/pe+i1sFoJrKtxUY+6u9ldWJtVXaldJWYIAQKBgQDp70ncRSIQRJfCu2Yb\nFKA5c6PxDuHzoxk+ytheku9dj7XueZNVGxlbSnu8oWMKVWeKKxeLMf5PxdU03MOz\nL0NJhHqN7aN4lzFXMy0uWM5Kyo8ocdoNHPO6oe69K/9+XqYrplPt0NHIgyubZy/2\npMkRhwtZc5X6kHNUJwmCnGVIAQKBgQC1pjQMAK9CeTJR90+NV/l/tVEsqwVJfetO\ncp88iihn31SM+lrzYEbO95Gti3oIB4Jxz71YeXQRJ/X4oNOIth5QQMOK1prwJ1kn\nstExmYHgjIhGT9HAAviAm988AC5uVL5d0+H5QkYLN/CsAXdnQ42OlCYKJHdaAtPR\npmNPPlRzFwKBgQCJ0ZHAFXKWBvMppGHpPmOOtVQ2ZkAz2zi6R6LlRMeEZXAXiMSF\n9SshH2Z6oNHKero/Klf6h399291aAV3CKOwJWeUhzIjsOJa2+s15apROd7uTZk/C\nPfZRU6llBZDGEFjxilIT31xYNv7v1QDq2/YhP2AuWOxY69UmFMGDk0QQAQKBgD1A\nfR5rAK4mlgxDm6SqvKwOpP+t74t3lWgPiJhuce+MxEMBjLeyiE3z90CQ3qZked0M\n0ulJkxTR58Rd3tajqpcfL5DaisZeTlbvmlDiVYQ1fyJOegkIN2mOpfjiisWTd9nF\nv9ZAPcQ8qcAmgm/kvJAObsFOyJwmheyU8bnf57QjAoGBAIxO6dgElQeYcQCgObfU\nGm5VKlJjKqg7gt47iQTfZdogvXPazeE+1OFP4CxDa0c37R3rz+bEKRO5rmxYR3Ev\nd5Grbt0EFzYsYJBSvPp1lbS1D7VBGXr5k1pLeGTudIwgqWtHFdObZMFl3d3Yn6eU\naMjQvyyEaA58T6PJwhVYIIiV\n-----END PRIVATE KEY-----\n",
+    "client_email": "firebase-adminsdk-cer5l@testdrivingsafety.iam.gserviceaccount.com",
+    "client_id": "111849249869729250975",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-cer5l%40testdrivingsafety.iam.gserviceaccount.com",
+    "universe_domain": "googleapis.com"
+  }
+}
